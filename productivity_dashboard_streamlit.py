@@ -1,7 +1,7 @@
 
 """
-Productivity Intelligence Agent - Streamlit Web Dashboard
-Run with: streamlit run productivity_dashboard.py
+Productivity Intelligence Agent - Streamlit Web Dashboard (Fixed for Cloud)
+Run with: streamlit run productivity_dashboard_streamlit.py
 """
 
 import streamlit as st
@@ -36,7 +36,6 @@ st.markdown("""
 
 # Initialize session state
 if 'agent' not in st.session_state:
-    # Import the agent class (assumes productivity_agent.py is in same directory)
     try:
         from productivity_agent import ProductivityIntelligenceAgent
         st.session_state.agent = ProductivityIntelligenceAgent(user_name="Engineer")
@@ -185,18 +184,19 @@ if len(agent.data) > 0:
             title="Tasks over Time (bubble size = complexity)"
         )
 
-        # Highlight peaks
-        peaks_df = df_plot[df_plot['is_peak'] == 1]
-        if len(peaks_df) > 0:
-            fig.add_trace(go.Scatter(
-                x=peaks_df['start_date'],
-                y=peaks_df['productivity_score'],
-                mode='markers',
-                marker=dict(size=20, color='yellow', symbol='star', line=dict(width=2, color='red')),
-                name='🔥 Peak Performance',
-                hovertemplate='<b>PEAK</b><br>%{text}<extra></extra>',
-                text=peaks_df['task']
-            ))
+        # FIX: Safely check for is_peak column before using it
+        if 'is_peak' in df_plot.columns:
+            peaks_df = df_plot[df_plot['is_peak'] == 1]
+            if len(peaks_df) > 0:
+                fig.add_trace(go.Scatter(
+                    x=peaks_df['start_date'],
+                    y=peaks_df['productivity_score'],
+                    mode='markers',
+                    marker=dict(size=20, color='yellow', symbol='star', line=dict(width=2, color='red')),
+                    name='Peak Performance',
+                    hovertemplate='<b>PEAK</b><br>%{text}<extra></extra>',
+                    text=peaks_df['task']
+                ))
 
         fig.update_layout(height=400)
         st.plotly_chart(fig, use_container_width=True)
@@ -254,12 +254,20 @@ if len(agent.data) > 0:
     st.markdown("---")
     st.subheader("📋 All Tasks Data")
 
-    display_df = agent.data[['task', 'category', 'start_date', 'days', 'complexity', 
-                             'productivity_score', 'efficiency', 'is_peak', 'cluster_label']].copy()
+    display_cols = ['task', 'category', 'start_date', 'days', 'complexity', 
+                    'productivity_score', 'efficiency']
+    if 'is_peak' in agent.data.columns:
+        display_cols.append('is_peak')
+    if 'cluster_label' in agent.data.columns:
+        display_cols.append('cluster_label')
+
+    display_df = agent.data[display_cols].copy()
     display_df['start_date'] = display_df['start_date'].dt.strftime('%Y-%m-%d')
     display_df['productivity_score'] = display_df['productivity_score'].round(2)
     display_df['efficiency'] = display_df['efficiency'].round(2)
-    display_df['is_peak'] = display_df['is_peak'].map({1: '🔥 PEAK', 0: '-'})
+
+    if 'is_peak' in display_df.columns:
+        display_df['is_peak'] = display_df['is_peak'].map({1: '🔥 PEAK', 0: '-'})
 
     st.dataframe(display_df, use_container_width=True, height=300)
 
